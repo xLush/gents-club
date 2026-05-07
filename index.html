@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GENT'S CLUB | Canlı Randevu Sistemi</title>
+    <title>GENT'S CLUB | Exclusive Booking</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, set, onValue, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, set, onValue, push, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-        // Senin Firebase Bilgilerin
         const firebaseConfig = {
             apiKey: "AIzaSyCK94aBrZytrQ2eSwkkcVnM74kaZ3bntlA",
             authDomain: "gentsclub-ef7fa.firebaseapp.com",
@@ -21,79 +20,72 @@
             databaseURL: "https://gentsclub-ef7fa-default-rtdb.europe-west1.firebasedatabase.app/"
         };
 
-        // Firebase Başlat
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // --- GLOBAL FONKSİYONLAR ---
+        // Randevu Kaydet
         window.saveBooking = function() {
             const date = document.getElementById('res-date').value;
             const time = document.getElementById('res-time').value;
-            
-            if(!date || !time || time.includes("DOLU")) return alert("Lütfen geçerli bir tarih ve saat seçin.");
+            if(!date || !time || time.includes("DOLU")) return alert("Geçerli bir saat seç kanka.");
 
-            const newBookingRef = push(ref(db, 'randevular'));
-            set(newBookingRef, {
-                user: window.currentUser,
-                date: date,
-                time: time,
-                timestamp: Date.now()
-            }).then(() => {
-                alert("Randevunuz başarıyla merkeze iletildi!");
-            }).catch((error) => {
-                alert("Hata: Veritabanı izni alınamadı! (Test modunu açtınız mı?)");
+            const newRef = push(ref(db, 'randevular'));
+            set(newRef, { user: window.currentUser, date, time }).then(() => {
+                alert("Randevu mühürlendi!");
             });
         };
 
+        // Saatleri Güncelle (Dolu/Boş)
         window.updateAvailableHours = function() {
             const dateInput = document.getElementById('res-date').value;
             const timeSelect = document.getElementById('res-time');
-            if (!dateInput) return;
-
             onValue(ref(db, 'randevular'), (snapshot) => {
                 const data = snapshot.val();
-                const appointments = data ? Object.values(data) : [];
-                
+                const apps = data ? Object.values(data) : [];
                 timeSelect.innerHTML = "";
                 for (let i = 10; i <= 22; i++) {
                     const hour = i + ":00";
-                    const isTaken = appointments.some(a => a.date === dateInput && a.time === hour);
-                    const option = document.createElement("option");
-                    option.value = hour;
-                    if (isTaken) {
-                        option.textContent = hour + " - (DOLU)";
-                        option.disabled = true;
-                    } else {
-                        option.textContent = hour;
-                    }
-                    timeSelect.appendChild(option);
+                    const isTaken = apps.some(a => a.date === dateInput && a.time === hour);
+                    const opt = document.createElement("option");
+                    opt.value = hour;
+                    opt.textContent = isTaken ? hour + " - (DOLU)" : hour;
+                    opt.disabled = isTaken;
+                    timeSelect.appendChild(opt);
                 }
             });
         };
 
+        // Randevu Silme (Admin İçin)
+        window.deleteBooking = function(key) {
+            if(confirm("Bu randevuyu defterden silmek istiyor musun?")) {
+                remove(ref(db, 'randevular/' + key)).then(() => {
+                    alert("Randevu silindi.");
+                });
+            }
+        };
+
+        // Admin Listesini Çek
         window.renderAdminList = function() {
             const list = document.getElementById('admin-list');
             onValue(ref(db, 'randevular'), (snapshot) => {
                 const data = snapshot.val();
                 list.innerHTML = "";
-                if(!data) {
-                    list.innerHTML = "<p class='text-zinc-500'>Randevu yok.</p>";
-                    return;
-                }
+                if(!data) { list.innerHTML = "<p class='text-zinc-500'>Defter boş.</p>"; return; }
                 Object.keys(data).forEach(key => {
                     const app = data[key];
                     list.innerHTML += `
-                        <div class="bg-zinc-900 p-4 border-l-2 border-[#c5a059] flex justify-between items-center mb-2">
+                        <div class="bg-zinc-900 p-4 border-l-2 border-[#c5a059] flex justify-between items-center mb-3 rounded-r-lg">
                             <div>
-                                <p class="text-xs gold-text">${app.date} - ${app.time}</p>
-                                <p class="font-bold">${app.user}</p>
+                                <p class="text-[10px] text-zinc-500 uppercase">${app.date}</p>
+                                <p class="gold-text font-bold text-lg">${app.time}</p>
+                                <p class="text-sm font-semibold">${app.user}</p>
                             </div>
+                            <button onclick="deleteBooking('${key}')" class="bg-red-900/20 text-red-500 text-[10px] px-3 py-2 rounded hover:bg-red-500 hover:text-white transition">SİL</button>
                         </div>`;
                 });
             });
         };
     </script>
-
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Montserrat:wght@300;600&display=swap');
         body { font-family: 'Montserrat', sans-serif; background-color: #080808; color: #fff; }
@@ -105,68 +97,62 @@
     </style>
 </head>
 <body>
-
-    <nav class="p-6 border-b border-zinc-800 flex justify-between items-center bg-black">
+    <nav class="p-6 border-b border-zinc-800 flex justify-between items-center bg-black sticky top-0 z-50">
         <div class="flex flex-col">
             <h1 class="brand-font text-2xl gold-text tracking-widest">GENT'S CLUB</h1>
-            <span class="text-[8px] text-zinc-500 uppercase tracking-[0.3em]">Live Booking System</span>
+            <span class="text-[8px] text-zinc-500 uppercase tracking-[0.3em]">Premium Barber Service</span>
         </div>
-        <button onclick="openAdmin()" class="text-[10px] border border-zinc-700 px-3 py-1 uppercase">Admin</button>
+        <button onclick="openAdmin()" class="text-[10px] border border-zinc-700 px-3 py-1 uppercase text-zinc-400 hover:text-white transition">Dükkan Paneli</button>
     </nav>
 
     <div class="container mx-auto px-4 py-10 max-w-md">
-        
         <div id="user-section" class="glass-card p-8 rounded-2xl shadow-2xl">
             <div id="login-area" class="text-center">
-                <h2 class="brand-font text-xl mb-6">HOŞ GELDİNİZ</h2>
-                <button onclick="mockLogin()" class="w-full gold-bg font-bold py-4 rounded-lg uppercase text-xs tracking-widest">GMAIL İLE GİRİŞ YAP (Simüle)</button>
+                <h2 class="brand-font text-xl mb-6">KULÜBE GİRİŞ</h2>
+                <button onclick="mockLogin()" class="w-full gold-bg font-bold py-4 rounded-lg uppercase text-xs tracking-widest hover:brightness-110 transition">GMAIL İLE BAĞLAN</button>
             </div>
-
             <div id="booking-form" class="hidden space-y-6">
-                <p id="welcome" class="text-center gold-text text-sm font-bold uppercase"></p>
+                <p id="welcome" class="text-center gold-text text-sm font-bold uppercase tracking-widest border-b border-zinc-800 pb-4"></p>
                 <div>
-                    <label class="text-[10px] text-zinc-500 uppercase block mb-2">Tarih</label>
+                    <label class="text-[10px] text-zinc-500 uppercase block mb-2 tracking-widest">Randevu Tarihi</label>
                     <input type="date" id="res-date" onchange="updateAvailableHours()">
                 </div>
                 <div>
-                    <label class="text-[10px] text-zinc-500 uppercase block mb-2">Müsait Saatler</label>
-                    <select id="res-time">
-                        <option>Önce Tarih Seçin</option>
-                    </select>
+                    <label class="text-[10px] text-zinc-500 uppercase block mb-2 tracking-widest">Müsait Saatler</label>
+                    <select id="res-time"><option>Önce Tarih Seçin</option></select>
                 </div>
-                <button onclick="saveBooking()" class="w-full gold-bg font-bold py-4 rounded-lg uppercase shadow-lg">RANDEVUYU MÜHÜRLER</button>
+                <button onclick="saveBooking()" class="w-full gold-bg font-bold py-4 rounded-lg uppercase shadow-lg text-xs tracking-widest">RANDEVUYU MÜHÜRLER</button>
             </div>
         </div>
 
-        <div id="admin-section" class="hidden space-y-4">
-            <h2 class="brand-font text-2xl gold-text mb-4">RANDEVU DEFTERİ</h2>
-            <div id="admin-list"></div>
-            <button onclick="location.reload()" class="text-xs text-zinc-500 underline w-full">Geri Dön</button>
+        <div id="admin-section" class="hidden animate-in fade-in duration-500">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="brand-font text-xl gold-text uppercase">KULÜP DEFTERİ</h2>
+                <button onclick="location.reload()" class="text-[10px] text-zinc-500 underline">Kapat</button>
+            </div>
+            <div id="admin-list" class="space-y-2"></div>
         </div>
     </div>
 
     <script>
         function mockLogin() {
-            const name = prompt("Adınız Soyadınız:");
+            const name = prompt("Ad Soyad Girin:");
             if(name) {
                 window.currentUser = name;
                 document.getElementById('login-area').classList.add('hidden');
                 document.getElementById('booking-form').classList.remove('hidden');
                 document.getElementById('welcome').innerText = "SAYIN " + name;
-                
                 const tomorrow = new Date();
                 tomorrow.setDate(tomorrow.getDate() + 1);
                 document.getElementById('res-date').min = tomorrow.toISOString().split("T")[0];
             }
         }
-
         function openAdmin() {
-            const pass = prompt("Yönetici Şifresi:");
-            if(pass === "1234") {
+            if(prompt("Yönetici Şifresi:") === "1234") {
                 document.getElementById('user-section').classList.add('hidden');
                 document.getElementById('admin-section').classList.remove('hidden');
                 window.renderAdminList();
-            }
+            } else { alert("Yetkisiz Giriş!"); }
         }
     </script>
 </body>
