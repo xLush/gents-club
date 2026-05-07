@@ -3,235 +3,170 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GENT'S CLUB | Exclusive Barber Shop</title>
+    <title>GENT'S CLUB | Canlı Randevu Sistemi</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // Senin Firebase Bilgilerin
+        const firebaseConfig = {
+            apiKey: "AIzaSyCK94aBrZytrQ2eSwkkcVnM74kaZ3bntlA",
+            authDomain: "gentsclub-ef7fa.firebaseapp.com",
+            projectId: "gentsclub-ef7fa",
+            storageBucket: "gentsclub-ef7fa.firebasestorage.app",
+            messagingSenderId: "906324172292",
+            appId: "1:906324172292:web:4261146ed8f19150ecdf51",
+            measurementId: "G-3RNTBEQDJK",
+            databaseURL: "https://gentsclub-ef7fa-default-rtdb.europe-west1.firebasedatabase.app/"
+        };
+
+        // Firebase Başlat
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // --- GLOBAL FONKSİYONLAR ---
+        window.saveBooking = function() {
+            const date = document.getElementById('res-date').value;
+            const time = document.getElementById('res-time').value;
+            
+            if(!date || !time || time.includes("DOLU")) return alert("Lütfen geçerli bir tarih ve saat seçin.");
+
+            const newBookingRef = push(ref(db, 'randevular'));
+            set(newBookingRef, {
+                user: window.currentUser,
+                date: date,
+                time: time,
+                timestamp: Date.now()
+            }).then(() => {
+                alert("Randevunuz başarıyla merkeze iletildi!");
+            }).catch((error) => {
+                alert("Hata: Veritabanı izni alınamadı! (Test modunu açtınız mı?)");
+            });
+        };
+
+        window.updateAvailableHours = function() {
+            const dateInput = document.getElementById('res-date').value;
+            const timeSelect = document.getElementById('res-time');
+            if (!dateInput) return;
+
+            onValue(ref(db, 'randevular'), (snapshot) => {
+                const data = snapshot.val();
+                const appointments = data ? Object.values(data) : [];
+                
+                timeSelect.innerHTML = "";
+                for (let i = 10; i <= 22; i++) {
+                    const hour = i + ":00";
+                    const isTaken = appointments.some(a => a.date === dateInput && a.time === hour);
+                    const option = document.createElement("option");
+                    option.value = hour;
+                    if (isTaken) {
+                        option.textContent = hour + " - (DOLU)";
+                        option.disabled = true;
+                    } else {
+                        option.textContent = hour;
+                    }
+                    timeSelect.appendChild(option);
+                }
+            });
+        };
+
+        window.renderAdminList = function() {
+            const list = document.getElementById('admin-list');
+            onValue(ref(db, 'randevular'), (snapshot) => {
+                const data = snapshot.val();
+                list.innerHTML = "";
+                if(!data) {
+                    list.innerHTML = "<p class='text-zinc-500'>Randevu yok.</p>";
+                    return;
+                }
+                Object.keys(data).forEach(key => {
+                    const app = data[key];
+                    list.innerHTML += `
+                        <div class="bg-zinc-900 p-4 border-l-2 border-[#c5a059] flex justify-between items-center mb-2">
+                            <div>
+                                <p class="text-xs gold-text">${app.date} - ${app.time}</p>
+                                <p class="font-bold">${app.user}</p>
+                            </div>
+                        </div>`;
+                });
+            });
+        };
+    </script>
+
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Montserrat:wght@300;400;600&display=swap');
-        
-        :root {
-            --gold: #c5a059;
-            --dark-gray: #121212;
-        }
-
-        body { 
-            font-family: 'Montserrat', sans-serif; 
-            background-color: #080808; 
-            color: #ffffff; 
-            margin: 0;
-        }
-
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Montserrat:wght@300;600&display=swap');
+        body { font-family: 'Montserrat', sans-serif; background-color: #080808; color: #fff; }
         .brand-font { font-family: 'Cinzel', serif; }
-        
-        .gold-text { color: var(--gold); }
-        .gold-bg { background-color: var(--gold); color: #000; }
-        .gold-border { border-color: var(--gold); }
-
-        .glass-card {
-            background: rgba(20, 20, 20, 0.8);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(197, 160, 89, 0.2);
-        }
-
-        input, select {
-            background: #1a1a1a !important;
-            border: 1px solid #333 !important;
-            color: white !important;
-        }
-
-        input:focus, select:focus {
-            border-color: var(--gold) !important;
-        }
-
-        /* Dolu saatlerin stili */
-        option:disabled {
-            color: #555 !important;
-            background: #000 !important;
-        }
+        .gold-text { color: #c5a059; }
+        .gold-bg { background-color: #c5a059; color: #000; }
+        .glass-card { background: rgba(20, 20, 20, 0.9); border: 1px solid rgba(197, 160, 89, 0.2); }
+        input, select { background: #1a1a1a; border: 1px solid #333; color: white; width: 100%; padding: 1rem; border-radius: 8px; outline: none; }
     </style>
 </head>
 <body>
 
-    <nav class="p-6 border-b border-zinc-800 flex justify-between items-center bg-black sticky top-0 z-50">
+    <nav class="p-6 border-b border-zinc-800 flex justify-between items-center bg-black">
         <div class="flex flex-col">
-            <h1 class="brand-font text-3xl gold-text tracking-[0.2em]">GENT'S CLUB</h1>
-            <span class="text-[10px] text-zinc-500 tracking-[0.4em] uppercase">Premium Barber Experience</span>
+            <h1 class="brand-font text-2xl gold-text tracking-widest">GENT'S CLUB</h1>
+            <span class="text-[8px] text-zinc-500 uppercase tracking-[0.3em]">Live Booking System</span>
         </div>
-        <div class="flex gap-6 items-center">
-            <button onclick="location.reload()" class="text-xs uppercase tracking-widest hover:gold-text transition">Ana Sayfa</button>
-            <button onclick="openAdminModal()" class="border border-zinc-700 px-4 py-2 rounded text-[10px] uppercase tracking-widest hover:bg-white hover:text-black transition">Dükkan Paneli</button>
-        </div>
+        <button onclick="openAdmin()" class="text-[10px] border border-zinc-700 px-3 py-1 uppercase">Admin</button>
     </nav>
 
-    <div class="container mx-auto px-4 py-12 max-w-5xl">
+    <div class="container mx-auto px-4 py-10 max-w-md">
         
-        <section id="user-section" class="flex flex-col items-center">
-            <div class="max-w-md w-full glass-card p-10 rounded-none border-t-4 border-t-[#c5a059] shadow-2xl">
-                <h2 class="brand-font text-2xl text-center mb-8 tracking-widest">RANDEVU SİSTEMİ</h2>
-                
-                <div id="login-area" class="space-y-6">
-                    <p class="text-center text-zinc-400 text-sm">Hizmet alabilmek için kulübe giriş yapın.</p>
-                    <button onclick="mockGoogleLogin()" class="w-full flex items-center justify-center gap-3 bg-white text-black p-4 rounded-none font-bold uppercase text-xs tracking-widest hover:bg-zinc-200 transition">
-                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18">
-                        GMAIL İLE BAĞLAN
-                    </button>
-                </div>
-
-                <div id="booking-form" class="hidden space-y-6">
-                    <div class="bg-zinc-800/50 p-3 text-center border border-zinc-700">
-                        <span id="user-info" class="text-xs gold-text font-bold tracking-widest uppercase"></span>
-                    </div>
-
-                    <div>
-                        <label class="text-[10px] text-zinc-500 uppercase tracking-widest block mb-2">Tarih Seçimi</label>
-                        <input type="date" id="res-date" onchange="updateAvailableHours()" class="w-full p-4 outline-none">
-                    </div>
-
-                    <div>
-                        <label class="text-[10px] text-zinc-500 uppercase tracking-widest block mb-2">Saat Seçimi</label>
-                        <select id="res-time" class="w-full p-4 outline-none appearance-none">
-                            <option value="">Önce Tarih Seçin</option>
-                        </select>
-                    </div>
-
-                    <button onclick="saveBooking()" class="w-full gold-bg font-bold py-5 mt-4 tracking-[0.2em] uppercase text-sm hover:brightness-110 transition shadow-lg">
-                        RANDEVUYU MÜHÜRLE
-                    </button>
-                </div>
+        <div id="user-section" class="glass-card p-8 rounded-2xl shadow-2xl">
+            <div id="login-area" class="text-center">
+                <h2 class="brand-font text-xl mb-6">HOŞ GELDİNİZ</h2>
+                <button onclick="mockLogin()" class="w-full gold-bg font-bold py-4 rounded-lg uppercase text-xs tracking-widest">GMAIL İLE GİRİŞ YAP (Simüle)</button>
             </div>
-        </section>
 
-        <section id="admin-section" class="hidden">
-            <div class="flex justify-between items-end mb-10">
+            <div id="booking-form" class="hidden space-y-6">
+                <p id="welcome" class="text-center gold-text text-sm font-bold uppercase"></p>
                 <div>
-                    <h2 class="brand-font text-4xl gold-text">KULÜP DEFTERİ</h2>
-                    <p class="text-zinc-500 text-sm mt-2">Tüm aktif randevular aşağıda listelenmiştir.</p>
+                    <label class="text-[10px] text-zinc-500 uppercase block mb-2">Tarih</label>
+                    <input type="date" id="res-date" onchange="updateAvailableHours()">
                 </div>
-                <button onclick="logoutAdmin()" class="text-xs text-red-500 border border-red-500/30 px-4 py-2 hover:bg-red-500 hover:text-white transition uppercase">Güvenli Çıkış</button>
+                <div>
+                    <label class="text-[10px] text-zinc-500 uppercase block mb-2">Müsait Saatler</label>
+                    <select id="res-time">
+                        <option>Önce Tarih Seçin</option>
+                    </select>
+                </div>
+                <button onclick="saveBooking()" class="w-full gold-bg font-bold py-4 rounded-lg uppercase shadow-lg">RANDEVUYU MÜHÜRLER</button>
             </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="admin-list">
-                </div>
-        </section>
-    </div>
+        </div>
 
-    <div id="admin-modal" class="fixed inset-0 bg-black/95 hidden flex items-center justify-center p-4 z-[100]">
-        <div class="glass-card p-10 max-w-sm w-full border-t-4 border-t-[#c5a059]">
-            <h3 class="brand-font text-xl mb-6 text-center tracking-widest">YÖNETİCİ DOĞRULAMA</h3>
-            <input type="password" id="admin-pass" placeholder="Giriş Şifresi" class="w-full p-4 mb-6 outline-none text-center tracking-[0.5em]">
-            <div class="flex gap-4">
-                <button onclick="loginAdmin()" class="flex-1 gold-bg font-bold py-3 uppercase text-xs tracking-widest">Giriş</button>
-                <button onclick="closeAdminModal()" class="flex-1 border border-zinc-700 py-3 uppercase text-xs tracking-widest">Kapat</button>
-            </div>
+        <div id="admin-section" class="hidden space-y-4">
+            <h2 class="brand-font text-2xl gold-text mb-4">RANDEVU DEFTERİ</h2>
+            <div id="admin-list"></div>
+            <button onclick="location.reload()" class="text-xs text-zinc-500 underline w-full">Geri Dön</button>
         </div>
     </div>
 
     <script>
-        const ADMIN_PASSWORD = "1234"; 
-
-        window.onload = () => {
-            // Yarından itibaren başlat
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            document.getElementById('res-date').min = tomorrow.toISOString().split("T")[0];
-        }
-
-        // --- SAAT GÜNCELLEME MANTIĞI ---
-        function updateAvailableHours() {
-            const dateInput = document.getElementById('res-date').value;
-            const timeSelect = document.getElementById('res-time');
-            
-            if (!dateInput) return;
-
-            // Kayıtlı randevuları al
-            const appointments = JSON.parse(localStorage.getItem('gents_club_data')) || [];
-            
-            timeSelect.innerHTML = ""; // Listeyi temizle
-
-            for (let i = 10; i <= 22; i++) {
-                const hour = i + ":00";
-                const isTaken = appointments.some(a => a.date === dateInput && a.time === hour);
-                
-                const option = document.createElement("option");
-                option.value = hour;
-                
-                if (isTaken) {
-                    option.textContent = hour + " - (DOLU)";
-                    option.disabled = true;
-                } else {
-                    option.textContent = hour;
-                }
-                
-                timeSelect.appendChild(option);
-            }
-        }
-
-        // --- GİRİŞ VE KAYIT SİSTEMİ ---
-        function mockGoogleLogin() {
-            const name = prompt("Lütfen Gmail Ad Soyad Giriniz:", "Gökhan Gent");
+        function mockLogin() {
+            const name = prompt("Adınız Soyadınız:");
             if(name) {
+                window.currentUser = name;
                 document.getElementById('login-area').classList.add('hidden');
                 document.getElementById('booking-form').classList.remove('hidden');
-                document.getElementById('user-info').innerText = "Üye: " + name;
-                window.currentUser = name;
+                document.getElementById('welcome').innerText = "SAYIN " + name;
+                
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                document.getElementById('res-date').min = tomorrow.toISOString().split("T")[0];
             }
         }
 
-        function saveBooking() {
-            const date = document.getElementById('res-date').value;
-            const time = document.getElementById('res-time').value;
-            
-            if(!date || !time) return alert("Lütfen tarih ve müsait bir saat seçiniz.");
-
-            let appointments = JSON.parse(localStorage.getItem('gents_club_data')) || [];
-            
-            appointments.push({ id: Date.now(), user: window.currentUser, date, time });
-            localStorage.setItem('gents_club_data', JSON.stringify(appointments));
-            
-            alert("Randevunuz GENT'S CLUB defterine işlenmiştir.");
-            updateAvailableHours(); // Listeyi anında güncelle
-        }
-
-        // --- ADMIN FONKSİYONLARI ---
-        function openAdminModal() { document.getElementById('admin-modal').classList.remove('hidden'); }
-        function closeAdminModal() { document.getElementById('admin-modal').classList.add('hidden'); }
-
-        function loginAdmin() {
-            if(document.getElementById('admin-pass').value === ADMIN_PASSWORD) {
-                document.getElementById('admin-modal').classList.add('hidden');
+        function openAdmin() {
+            const pass = prompt("Yönetici Şifresi:");
+            if(pass === "1234") {
                 document.getElementById('user-section').classList.add('hidden');
                 document.getElementById('admin-section').classList.remove('hidden');
-                renderAdminList();
-            } else { alert("Geçersiz yetki!"); }
-        }
-
-        function logoutAdmin() { location.reload(); }
-
-        function renderAdminList() {
-            const list = document.getElementById('admin-list');
-            const appointments = JSON.parse(localStorage.getItem('gents_club_data')) || [];
-            
-            if(appointments.length === 0) {
-                list.innerHTML = `<p class="text-zinc-600 italic">Henüz randevu kaydı bulunmuyor.</p>`;
-                return;
+                window.renderAdminList();
             }
-
-            list.innerHTML = appointments.map(app => `
-                <div class="glass-card p-6 border-l-2 border-l-[#c5a059] flex justify-between items-center">
-                    <div>
-                        <p class="text-[10px] text-zinc-500 uppercase tracking-widest">${app.date}</p>
-                        <p class="brand-font text-xl gold-text">${app.time}</p>
-                        <p class="text-sm font-bold mt-1">${app.user}</p>
-                    </div>
-                    <button onclick="deleteApp(${app.id})" class="text-zinc-600 hover:text-red-500 text-xs">SİL</button>
-                </div>
-            `).join('');
-        }
-
-        function deleteApp(id) {
-            if(!confirm("Kaydı silmek istediğinize emin misiniz?")) return;
-            let apps = JSON.parse(localStorage.getItem('gents_club_data')) || [];
-            localStorage.setItem('gents_club_data', JSON.stringify(apps.filter(a => a.id !== id)));
-            renderAdminList();
         }
     </script>
 </body>
